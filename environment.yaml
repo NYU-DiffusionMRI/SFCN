@@ -1,0 +1,18 @@
+name: ukbb_deep_pretrain
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - pytorch-cuda=11.8
+  - numpy
+  - matplotlib
+  - scipy
+  - notebook
+  - pip
+  - pip:
+    - nibabel  # for reading .nii.gz files
