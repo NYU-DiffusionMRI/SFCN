@@ -82,11 +82,11 @@ def main():
 
     df = drop_duplicate_rows(df)
 
-    out_file = Path('data/IXI/sampled_age_44_80_no_duplicates.csv')
+    out_file = Path('data/IXI/sampled_age_44_80.csv')
     df.to_csv(out_file, index=False)
     print(f"Saved {len(df)} rows to {out_file}")
 
-    sampled_dir = Path('data/IXI/T1/sampled_age_44_80_no_duplicates')
+    sampled_dir = Path('data/IXI/T1/sampled_age_44_80')
     create_sampled_symlinks(list(df["IMAGE_PATH"]), sampled_dir)
     print(f"Created {len(df)} symlinks in {sampled_dir}")
 

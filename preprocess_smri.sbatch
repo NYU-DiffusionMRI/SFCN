@@ -16,4 +16,4 @@ source /gpfs/home/dl5635/.bashrc
 conda activate ukbb_deep_pretrain
 cd /gpfs/data/fieremanslab/dayne/SFCN
 
-PYTHONPATH=$PYTHONPATH:$(pwd) python scripts/preprocess.py --input_dir data/IXI/T1/sampled_age_44_80_no_duplicates
+PYTHONPATH=$PYTHONPATH:$(pwd) python scripts/preprocess.py --input_dir data/IXI/T1/sampled_age_44_80

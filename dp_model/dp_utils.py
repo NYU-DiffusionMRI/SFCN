@@ -43,22 +43,25 @@ def num2vect(x, bin_range, bin_step, sigma):
                     cdfs = norm.cdf([x1, x2], loc=x[j], scale=sigma)
                     v[j, i] = cdfs[1] - cdfs[0]
             return v, bin_centers
-        
-        
+
+
 def crop_center(data, out_sp):
     """
     Returns the center part of volume data.
     crop: in_sp > out_sp
-    Example: 
+    Example:
     data.shape = np.random.rand(182, 218, 182)
     out_sp = (160, 192, 160)
     data_out = crop_center(data, out_sp)
     """
     in_sp = data.shape
     nd = np.ndim(data)
-    x_crop = int((in_sp[-1] - out_sp[-1]) / 2)
-    y_crop = int((in_sp[-2] - out_sp[-2]) / 2)
-    z_crop = int((in_sp[-3] - out_sp[-3]) / 2)
+
+    assert in_sp[-3:] == (182, 218, 182), f"Unexpected shape: {in_sp[-3:]}"
+
+    x_crop = (in_sp[-3] - out_sp[-3]) // 2
+    y_crop = (in_sp[-2] - out_sp[-2]) // 2
+    z_crop = (in_sp[-1] - out_sp[-1]) // 2
     if nd == 3:
         data_crop = data[x_crop:-x_crop, y_crop:-y_crop, z_crop:-z_crop]
     elif nd == 4:
