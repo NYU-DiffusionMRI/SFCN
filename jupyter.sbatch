@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --nodes 1
-#SBATCH --ntasks-per-node 1
+#SBATCH --partition=gpu4_short
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16GB
-#SBATCH --time 00-12:00:00
-#SBATCH --gres=gpu:a100:1
-#SBATCH --job-name jupyter-notebook
-#SBATCH --output notebook_logs/jupyter-notebook-%J.log
+#SBATCH --time=00-12:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=notebook
+#SBATCH --output=logs/notebook_%J.log
 
 
 # get tunneling info
@@ -54,6 +55,7 @@ Use the token string from the URL printed below and add it to the URL above
 
 # STEP #1: load necessary modules
 module load cuda/11.8
+module load fsl/6.0.7   # NOTE: to use the MNI152 template
 
 # STEP #2: replace the bashrc with your bashrc
 source /gpfs/home/dl5635/.bashrc

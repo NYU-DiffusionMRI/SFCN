@@ -5,4 +5,5 @@ dp_model/model_files/__pycache__
 
 __pycache__
 
-notebook_logs/
+logs/
+data/
