@@ -7,7 +7,7 @@
 #SBATCH --time=00-12:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=notebook
-#SBATCH --output=logs/notebook_%J.log
+#SBATCH --output=logs/%X_%J.log
 
 
 # get tunneling info
