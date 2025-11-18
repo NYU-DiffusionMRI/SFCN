@@ -7,7 +7,7 @@
 #SBATCH --time=00-12:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=smri_preprocessing
-#SBATCH --output=logs/%X_%J.log
+#SBATCH --output=logs/%x_%j.log
 
 module load cuda/11.8
 module load fsl/6.0.7   # NOTE: to use the MNI152 template

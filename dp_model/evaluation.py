@@ -24,13 +24,14 @@ class BrainAgeDataset(Dataset):
 
     def __getitem__(self, idx) -> tuple[torch.Tensor, torch.Tensor, str]:
         row = self.df.iloc[idx]
-        vol = ants.image_read(str(row["PREPROCESSED_IMAGE_PATH"])).numpy().astype(np.float32)
+        vol = ants.image_read(str(row["preproc_image"])).numpy().astype(np.float32)
         vol = vol / (vol.mean() + 1e-8)
         # vol = (vol - vol.min()) / (vol.max() - vol.min() + 1e-8)
         vol = dp_utils.crop_center(vol, CROP_SHAPE)
         vol = vol[None, ...]  # (1, D, H, W)
-        age = np.float32(row["AGE"])
-        return torch.from_numpy(vol), torch.tensor(age, dtype=torch.float32), row["IXI_ID"]
+        age = np.float32(row["age"])
+
+        return torch.from_numpy(vol), torch.tensor(age, dtype=torch.float32), row["scan_id"]
 
 
 @torch.no_grad()
