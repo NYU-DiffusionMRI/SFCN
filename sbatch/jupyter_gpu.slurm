@@ -1,11 +1,12 @@
 #!/bin/bash
-#SBATCH --partition=cpu_short
+#SBATCH --partition=gpu4_short
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=00-12:00:00
 #SBATCH --mem=64GB
-#SBATCH --job-name=jupyter
+#SBATCH --time=00-12:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=jupyter_gpu
 #SBATCH --output=logs/%x/%j.log
 
 
@@ -52,9 +53,18 @@ Use the token string from the URL printed below and add it to the URL above
 
 # load modules or conda environments here
 
-module load cuda/12.6
+# STEP #1: load necessary modules
+module load cuda/11.8
+module load fsl/6.0.7   # NOTE: to use the MNI152 template
+
+# STEP #2: replace the bashrc with your bashrc
 source /gpfs/home/dl5635/.bashrc
-conda activate ssl-vision
-cd /gpfs/data/fieremanslab/dayne/projects/DL-Final-Competition
-mkdir -p logs/${SLURM_JOB_NAME}
+
+# STEP #3: activate the conda env
+conda activate ukbb_deep_pretrain
+
+# STEP #4: cd to your workspace
+cd /gpfs/data/fieremanslab/dayne/SFCN
+
+# STEP #5: start the jupyter notebook
 jupyter-notebook --no-browser --port=${port} --ip=${node}
