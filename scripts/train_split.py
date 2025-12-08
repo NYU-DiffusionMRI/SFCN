@@ -60,6 +60,8 @@ def main():
     # append the split to the unified data and save
     if UNIFIED_DATA_CSV.exists():
         unified_data = pd.read_csv(UNIFIED_DATA_CSV)
+        assert args.dataset_name not in unified_data['dataset'].values, f"Dataset {args.dataset_name} already exists in the unified data"
+
         unified_data = pd.concat([unified_data, df], ignore_index=True)
     else:
         unified_data = df

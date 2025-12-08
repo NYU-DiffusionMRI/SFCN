@@ -56,6 +56,7 @@ def main():
     # 5. add T1w_path column (relative to the raw data directory)
     raw_dir = Path('data/IXI/raw')
     demo_clean['T1w_path'] = demo_clean['subject_ID'].apply(lambda id: map_scan_path(id, raw_dir))
+    demo_clean = demo_clean[demo_clean['T1w_path'].notna()]
 
     demo_clean.to_csv(out_file, index=False)
     print(f"Saved {len(demo_clean)} rows to {out_file}")
