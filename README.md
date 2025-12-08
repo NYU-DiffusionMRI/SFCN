@@ -43,22 +43,39 @@ Han Peng, Weikang Gong, Christian F. Beckmann, Andrea Vedaldi, Stephen M Smith
 
 ## Add Ons
 
+To build `oasis_mr_ids.csv`:
+
 ```bash
-# To build oasis_mr_ids.csv:
 # 1. Download the MR sessions csv from the NITRC
 # 2. Run below command to leave only the experiment ID column
 cut -d, -f1 <DOWNLOADED_OASIS_MR_SESSIONS_CSV> data/OASIS_3/oasis_MR_ids.csv
 # 3. Download the scans using the bash script
 bash scripts/download_oasis_scans.sh data/OASIS_3/oasis_MR_ids.csv data/OASIS_3/raw <NITRC_USERNAME> T1w
 
+downloading the ABIDE 1 dataset:
+
+```bash
 # ABIDE_1.zip is downloaded from the NITRC
 # age included csv file can also be downloaded from there
 unzip -d data/ABIDE_1/raw data/ABIDE_1/ABIDE_1.zip
 ```
 
+To clean the specific dataset csv fle:
+
 ```bash
-# To clean the specific dataset csv fle:
 python scripts/clean_${DATASET_NAME}$.py
-# e.g. python scripts/clean_OASIS_3.py
-# this ensures the csv has four columns: subject_ID, MR_ID, age, T1w_path
+
+# for example:
+python scripts/clean_OASIS_3.py
+
+# this ensures the csv contains four columns: subject_ID, MR_ID, age, T1w_path
+```
+
+To split the data into train, validation and test sets, then append (or create) the unified data csv:
+
+```bash
+python scripts/train_split.py --input-csv <PATH_TO_CLEANED_DATASET_CSV> --dataset-name <DATASET_NAME>
+
+# for example:
+python scripts/train_split.py --input-csv data/OASIS_3/OASIS3_cleaned.csv --dataset-name OASIS_3
 ```
