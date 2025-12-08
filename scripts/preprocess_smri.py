@@ -15,10 +15,12 @@ def batch_debias_and_reorient(input_dir: Path, output_dir: Path, overwrite: bool
    assert input_dir.is_dir()
    output_dir.mkdir(parents=True, exist_ok=True)
 
-   input_files = sorted(input_dir.glob('*.nii.gz'))
+   input_files = sorted(input_dir.rglob('*.nii.gz'))
    output_files = []
    for file in input_files:
-      out_file = debias_and_reorient(file, output_dir, skip_exist=not overwrite)
+      relative_path = file.relative_to(input_dir)
+      file_output_dir = output_dir / relative_path.parent
+      out_file = debias_and_reorient(file, file_output_dir, skip_exist=not overwrite)
       output_files.append(out_file)
 
    return output_files
@@ -40,31 +42,63 @@ def batch_brain_extraction(input_dir: Path, output_dir: Path, overwrite: bool) -
     assert input_dir.is_dir()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    input_files = sorted(input_dir.glob('*.nii.gz'))
+    input_files = sorted(input_dir.rglob('*.nii.gz'))
 
-    if overwrite:
-        # simple HD-BET with batch support
-        log(f"  [BET] In Batch Mode (overwrite), {len(list(input_dir.glob('*.nii.gz')))} files to process")
+    # Create temp directory with flat structure for batch processing
+    with tempfile.TemporaryDirectory(prefix="hdbet_batch_input_") as tmp_in:
+        tmp_in = Path(tmp_in)
+        with tempfile.TemporaryDirectory(prefix="hdbet_batch_output_") as tmp_out:
+            tmp_out = Path(tmp_out)
 
-        _run_hdbet_batch(input_dir, output_dir)
-    else:
-        missing_files = [p for p in input_files if not (output_dir / p.name).exists()]
-        existing_files = [p for p in input_files if (output_dir / p.name).exists()]
+            # Determine which files need processing
+            files_to_process = []
+            for file in input_files:
+                relative_path = file.relative_to(input_dir)
+                out_path = output_dir / relative_path
+                if overwrite or not out_path.exists():
+                    files_to_process.append((file, relative_path))
 
-        log(f"  [BET] In Batch Mode (no overwrite), {len(missing_files)} files to process, {len(existing_files)} files already processed")
-        if missing_files:
-            if len(missing_files) == len(input_files):
-                # Fast path: identical to overwrite
-                _run_hdbet_batch(input_dir, output_dir)
-            else:
-                with tempfile.TemporaryDirectory(prefix="hdbet_batch_") as tmp:
-                    tmp = Path(tmp)
-                    for p in missing_files:
-                        os.symlink(p.resolve(), tmp / p.name)
+            if not files_to_process:
+                log(f"  [BET] All {len(input_files)} files already processed, skipping")
+                return [output_dir / file.relative_to(input_dir) for file in input_files]
 
-                    _run_hdbet_batch(tmp, output_dir)
+            log(f"  [BET] Processing {len(files_to_process)} files, {len(input_files) - len(files_to_process)} already processed")
 
-    expected = [output_dir / p.name for p in input_files]
+            # Create symlinks with unique names in temp input directory
+            file_mapping = {}  # Maps temp filename -> (original_file, relative_path)
+            for idx, (file, relative_path) in enumerate(files_to_process):
+                # Use index to ensure unique names
+                temp_name = f"file_{idx:06d}.nii.gz"
+                os.symlink(file.resolve(), tmp_in / temp_name)
+                file_mapping[temp_name] = (file, relative_path)
+
+            # Run HD-BET in batch mode
+            _run_hdbet_batch(tmp_in, tmp_out)
+
+            # Move outputs to correct locations preserving directory structure
+            # HD-BET produces two files: the brain-extracted image and the mask (*_bet.nii.gz)
+            for temp_name, (original_file, relative_path) in file_mapping.items():
+                # Move the brain-extracted image
+                temp_output = tmp_out / temp_name
+                final_output = output_dir / relative_path
+                final_output.parent.mkdir(parents=True, exist_ok=True)
+
+                if temp_output.exists():
+                    temp_output.rename(final_output)
+                else:
+                    raise RuntimeError(f"HD-BET failed to produce output for {original_file}")
+
+                # Move the brain mask file (*_bet.nii.gz)
+                temp_mask_name = temp_name.replace('.nii.gz', '_bet.nii.gz')
+                temp_mask = tmp_out / temp_mask_name
+                if temp_mask.exists():
+                    # Create mask path with same relative structure
+                    mask_relative_path = Path(str(relative_path).replace('.nii.gz', '_bet.nii.gz'))
+                    final_mask = output_dir / mask_relative_path
+                    temp_mask.rename(final_mask)
+
+    # Return all expected output files
+    expected = [output_dir / file.relative_to(input_dir) for file in input_files]
     if not all(p.exists() for p in expected):
         raise RuntimeError("HD-BET failed for batch mode")
 
@@ -79,10 +113,12 @@ def batch_mni_reg(input_dir: Path, output_dir: Path, overwrite: bool) -> List[Pa
     mni_152_template = Path(fsl_dir) / 'data/standard/MNI152_T1_1mm_brain.nii.gz'
 
 
-    input_files = sorted(f for f in input_dir.glob('*.nii.gz') if not str(f).endswith('_bet.nii.gz'))
+    input_files = sorted(f for f in input_dir.rglob('*.nii.gz') if not str(f).endswith('_bet.nii.gz'))
     output_files = []
     for file in input_files:
-        out_file = coregister_images(mni_152_template, file, output_dir, skip_exist=not overwrite)
+        relative_path = file.relative_to(input_dir)
+        file_output_dir = output_dir / relative_path.parent
+        out_file = coregister_images(mni_152_template, file, file_output_dir, skip_exist=not overwrite)
         output_files.append(out_file)
 
     return output_files
