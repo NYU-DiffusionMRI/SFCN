@@ -1,0 +1,16 @@
+datasets:
+  IXI:
+    root: "data/IXI/mni_reg"
+  OASIS_3:
+    root: "data/OASIS_3/mni_reg"
+
+data:
+  unified_csv: "data/unified_data.csv"
+
+model:
+  checkpoint_path: "brain_age/run_20190719_00_epoch_best_mae.p"  # Path to trained model checkpoint
+
+evaluation:
+  batch_size: 8
+  num_workers: 4
+  output_dir: "results"  # Directory to save evaluation results
