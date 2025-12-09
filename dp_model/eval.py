@@ -59,3 +59,29 @@ def predict_and_eval(
     mae = np.mean(np.abs(preds - trues))
 
     return pd.DataFrame({"MR_ID": ids, "true_age": trues, "pred_age": preds}), mae
+
+
+def bias_correct(cal_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[pd.DataFrame, float, float, tuple[float, float]]:
+    """
+    Apply bias correction using calibration set.
+
+    Args:
+        cal_df: Calibration DataFrame with 'true_age' and 'pred_age' columns
+        test_df: Test DataFrame with 'true_age' and 'pred_age' columns
+
+    Returns:
+        Tuple of (corrected_test_df, mae_before, mae_after, (a, b))
+        where corrected_test_df has 'pred_age_corrected' column added
+    """
+    # Fit linear model on calibration: pred = a * true + b
+    a, b = np.polyfit(cal_df['true_age'], cal_df['pred_age'], 1)
+
+    # Apply correction on test: corrected = (pred - b) / a
+    test_df = test_df.copy()
+    test_df['pred_age_corrected'] = (test_df['pred_age'] - b) / a
+
+    # Compute MAEs
+    mae_before = np.abs(test_df['pred_age'] - test_df['true_age']).mean()
+    mae_after = np.abs(test_df['pred_age_corrected'] - test_df['true_age']).mean()
+
+    return test_df, mae_before, mae_after, (a, b)

@@ -25,7 +25,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from dp_model.model_files.sfcn import SFCN
-from dp_model.eval import predict_and_eval
+from dp_model.eval import predict_and_eval, bias_correct
 
 
 def load_config(config_path: str = "configs/default.yaml") -> dict:
@@ -104,7 +104,8 @@ def save_results(
     output_dir: str,
     datasets: list[str],
     split: str,
-    config_info: dict = None
+    config_info: dict = None,
+    bias_correction: dict = None
 ):
     """
     Save evaluation results to files.
@@ -116,6 +117,7 @@ def save_results(
         datasets: List of evaluated datasets
         split: Split that was evaluated
         config_info: Dictionary with configuration information to include in summary
+        bias_correction: Dictionary with bias correction results (mae_before, mae_after, a, b, n_cal)
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -153,7 +155,15 @@ def save_results(
 
         f.write(f"Results:\n")
         f.write(f"--------\n")
-        f.write(f"Mean Absolute Error (MAE): {mae:.4f} years\n\n")
+
+        # Bias correction results if available
+        if bias_correction:
+            f.write(f"MAE (before correction): {bias_correction['mae_before']:.4f} years\n")
+            f.write(f"MAE (after correction):  {bias_correction['mae_after']:.4f} years\n")
+            f.write(f"Bias fit: pred ≈ {bias_correction['a']:.3f} * true + {bias_correction['b']:.3f}\n")
+            f.write(f"Calibration samples (MR scans): {bias_correction['n_cal']}\n\n")
+        else:
+            f.write(f"Mean Absolute Error (MAE): {mae:.4f} years\n\n")
 
         # Per-dataset statistics if multiple datasets
         if 'dataset' in results_df.columns:
@@ -161,7 +171,10 @@ def save_results(
             f.write(f"-----------------------\n")
             for dataset in results_df['dataset'].unique():
                 df_ds = results_df[results_df['dataset'] == dataset]
-                mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
+                if 'pred_age_corrected' in df_ds.columns:
+                    mae_ds = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
+                else:
+                    mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
                 f.write(f"{dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})\n")
 
     print(f"Saved summary to: {summary_file}")
@@ -274,8 +287,8 @@ def main():
     model = load_model(checkpoint_path, device=device)
     print("Model loaded successfully\n")
 
-    # Run evaluation
-    print("Running evaluation...")
+    # Run evaluation on test set
+    print("Running evaluation on test set...")
     results_df, mae = predict_and_eval(
         model=model,
         df=df,
@@ -287,24 +300,62 @@ def main():
 
     # Add dataset column to results if needed
     if 'dataset' in df.columns:
-        # Merge dataset info back into results
         results_df = results_df.merge(
             df[['MR_ID', 'dataset']],
             on='MR_ID',
             how='left'
         )
 
+    # Bias correction using validation set as calibration
+    bias_correction_results = None
+    print("\nApplying bias correction using validation set...")
+    try:
+        df_val = load_and_filter_data(csv_path=unified_csv, datasets=args.datasets, split='val')
+        print(f"Loaded {len(df_val)} validation MR scans for calibration")
+
+        cal_df, _ = predict_and_eval(
+            model=model,
+            df=df_val,
+            root_dirs=root_dirs_filtered,
+            device=device,
+            batch_size=batch_size,
+            num_workers=num_workers
+        )
+
+        results_df, mae_before, mae_after, (a, b) = bias_correct(cal_df, results_df)
+        bias_correction_results = {
+            'mae_before': mae_before,
+            'mae_after': mae_after,
+            'a': a,
+            'b': b,
+            'n_cal': len(cal_df)
+        }
+        print(f"Bias fit: pred ≈ {a:.3f} * true + {b:.3f}")
+
+    except Exception as e:
+        print(f"Warning: Could not apply bias correction: {e}")
+        print("Proceeding without bias correction...")
+
     print("\n" + "="*60)
     print("EVALUATION RESULTS")
     print("="*60)
-    print(f"Overall MAE: {mae:.4f} years")
+
+    if bias_correction_results:
+        print(f"MAE (before correction): {bias_correction_results['mae_before']:.4f} years")
+        print(f"MAE (after correction):  {bias_correction_results['mae_after']:.4f} years")
+        print(f"Improvement: {bias_correction_results['mae_before'] - bias_correction_results['mae_after']:.4f} years")
+    else:
+        print(f"Overall MAE: {mae:.4f} years")
 
     # Per-dataset results
     if 'dataset' in results_df.columns:
         print("\nPer-Dataset Results:")
         for dataset in sorted(results_df['dataset'].unique()):
             df_ds = results_df[results_df['dataset'] == dataset]
-            mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
+            if 'pred_age_corrected' in df_ds.columns:
+                mae_ds = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
+            else:
+                mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
             print(f"  {dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})")
 
     print("="*60 + "\n")
@@ -326,7 +377,8 @@ def main():
         output_dir=output_dir,
         datasets=args.datasets,
         split=args.split,
-        config_info=config_info
+        config_info=config_info,
+        bias_correction=bias_correction_results
     )
 
     print("\nEvaluation completed successfully!")
