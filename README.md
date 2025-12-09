@@ -74,8 +74,8 @@ python scripts/clean_OASIS_3.py
 To split the data into train, validation and test sets, then append (or create) the unified data csv:
 
 ```bash
-python scripts/train_split.py --input-csv <PATH_TO_CLEANED_DATASET_CSV> --dataset-name <DATASET_NAME>
+python scripts/split_data.py --input-csv <PATH_TO_CLEANED_DATASET_CSV> --dataset-name <DATASET_NAME>
 
 # for example:
-python scripts/train_split.py --input-csv data/OASIS_3/OASIS3_cleaned.csv --dataset-name OASIS_3
+python scripts/split_data.py --input-csv data/OASIS_3/OASIS3_cleaned.csv --dataset-name OASIS_3
 ```
