@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import os
+import shutil
 import tempfile
 import subprocess
 import shlex
@@ -84,7 +85,7 @@ def batch_brain_extraction(input_dir: Path, output_dir: Path, overwrite: bool) -
                 final_output.parent.mkdir(parents=True, exist_ok=True)
 
                 if temp_output.exists():
-                    temp_output.rename(final_output)
+                    shutil.move(str(temp_output), str(final_output))
                 else:
                     raise RuntimeError(f"HD-BET failed to produce output for {original_file}")
 
@@ -95,7 +96,7 @@ def batch_brain_extraction(input_dir: Path, output_dir: Path, overwrite: bool) -
                     # Create mask path with same relative structure
                     mask_relative_path = Path(str(relative_path).replace('.nii.gz', '_bet.nii.gz'))
                     final_mask = output_dir / mask_relative_path
-                    temp_mask.rename(final_mask)
+                    shutil.move(str(temp_mask), str(final_mask))
 
     # Return all expected output files
     expected = [output_dir / file.relative_to(input_dir) for file in input_files]
