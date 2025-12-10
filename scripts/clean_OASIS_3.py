@@ -22,15 +22,13 @@ def map_scan_path(mr_id: str, raw_dir: Path) -> Optional[Path]:
         print(f"Session directory {session_dir} does not exist. Setting to None.")
         return None
 
-    # Find all anat directories (anat, anat2, anat3, etc.)
-    anat_dirs = sorted([d for d in session_dir.iterdir() if d.is_dir() and d.name.startswith('anat')])
-
-    if len(anat_dirs) == 0:
+    # Find all anat directories and choose the highest numbered one
+    anat_dirs = [d for d in session_dir.iterdir() if d.is_dir() and d.name.startswith('anat')]
+    if not anat_dirs:
         print(f"No anat directories found for {mr_id}. Setting to None.")
         return None
 
-    # Choose the last (highest numbered) anat directory
-    anat_dir = anat_dirs[-1]
+    anat_dir = max(anat_dirs, key=lambda d: int(d.name[4:]))
 
     # Find T1w files in this anat directory
     t1w_files = list(anat_dir.glob('*_T1w.nii.gz'))
