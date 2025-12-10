@@ -1,10 +1,15 @@
 from matplotlib import pyplot as plt
 from ipywidgets import interact
 import numpy as np
+import sys
 
 
 def log(msg: str):
     print(msg, flush=True)
+
+
+def log_error(msg: str):
+    print(msg, file=sys.stderr, flush=True)
 
 
 def explore_3D_array(arr: np.ndarray, cmap: str = 'gray'):

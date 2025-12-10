@@ -93,7 +93,11 @@ def coregister_images(fixed: Path, moving: Path, out_dir: Path, skip_exist=False
         img_m = ants.reorient_image2(img_m, orientation=orient_f)
 
     log(f"  [REG] running on {base}")
-    reg = ants.registration(fixed=img_f, moving=img_m, type_of_transform='Affine')
+    try:
+        reg = ants.registration(fixed=img_f, moving=img_m, type_of_transform='Affine')
+    except RuntimeError as e:
+        raise RuntimeError(f"Registration failed for {moving} (sum={img_m.sum()})") from e
+
     out = ants.apply_transforms(
         fixed=img_f, moving=img_m,
         transformlist=reg['fwdtransforms']

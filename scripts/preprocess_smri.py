@@ -9,7 +9,7 @@ from typing import List
 
 from preprocessing.structural_mri import debias_and_reorient, coregister_images
 
-from utils import log
+from utils import log, log_error
 
 
 def batch_debias_and_reorient(input_dir: Path, output_dir: Path, overwrite: bool) -> List[Path]:
@@ -35,7 +35,7 @@ def _run_hdbet_batch(input_dir: Path, output_dir: Path) -> None:
     log(f"[BET] running: {' '.join(shlex.quote(c) for c in cmd)}")    # for logging/debugging
     result = subprocess.run(cmd, check=True)
     if result.returncode != 0:
-        log(f"[BET][stderr] {result.stderr.strip()}")
+        log_error(f"[BET] {result.stderr.strip()}")
         raise RuntimeError("HD-BET failed for batch mode")
 
 
@@ -119,8 +119,12 @@ def batch_mni_reg(input_dir: Path, output_dir: Path, overwrite: bool) -> List[Pa
     for file in input_files:
         relative_path = file.relative_to(input_dir)
         file_output_dir = output_dir / relative_path.parent
-        out_file = coregister_images(mni_152_template, file, file_output_dir, skip_exist=not overwrite)
-        output_files.append(out_file)
+        try:
+            out_file = coregister_images(mni_152_template, file, file_output_dir, skip_exist=not overwrite)
+            output_files.append(out_file)
+        except RuntimeError as e:
+            log_error(f"[REG] failed for {file}: {e} -- skipping this image.")
+            continue
 
     return output_files
 
