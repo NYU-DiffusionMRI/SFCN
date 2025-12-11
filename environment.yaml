@@ -20,3 +20,4 @@ dependencies:
   - pip:
     - nibabel  # for reading .nii.gz files
     - hd-bet
+    - tqdm

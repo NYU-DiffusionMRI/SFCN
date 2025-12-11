@@ -7,10 +7,10 @@ It loads a unified CSV file with dataset and split columns, filters by the speci
 and split, and computes evaluation metrics.
 
 Usage:
-    python scripts/evaluate.py --config configs/default.yaml --datasets IXI OASIS_3 --split test
-    python scripts/evaluate.py --datasets IXI  # Evaluate on IXI test split only
-    python scripts/evaluate.py --datasets OASIS_3  # Evaluate on OASIS_3 test split only
-    python scripts/evaluate.py  # Evaluate on all datasets (IXI and OASIS_3) test split
+    PYTHONPATH=. python scripts/evaluate.py --config configs/default.yaml --datasets IXI OASIS_3 --split test
+    PYTHONPATH=. python scripts/evaluate.py --datasets IXI  # Evaluate on IXI test split only
+    PYTHONPATH=. python scripts/evaluate.py --datasets OASIS_3  # Evaluate on OASIS_3 test split only
+    PYTHONPATH=. python scripts/evaluate.py  # Evaluate on all datasets (IXI and OASIS_3) test split
 """
 
 import argparse
@@ -18,11 +18,6 @@ import yaml
 import pandas as pd
 import torch
 from pathlib import Path
-import sys
-
-# Add project root to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 from dp_model.model_files.sfcn import SFCN
 from dp_model.eval import predict_and_eval, bias_correct
@@ -172,10 +167,12 @@ def save_results(
             for dataset in results_df['dataset'].unique():
                 df_ds = results_df[results_df['dataset'] == dataset]
                 if 'pred_age_corrected' in df_ds.columns:
-                    mae_ds = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
+                    mae_before = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
+                    mae_after = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
+                    f.write(f"{dataset}: MAE = {mae_before:.4f} → {mae_after:.4f} years (n={len(df_ds)})\n")
                 else:
                     mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
-                f.write(f"{dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})\n")
+                    f.write(f"{dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})\n")
 
     print(f"Saved summary to: {summary_file}")
 
@@ -353,10 +350,12 @@ def main():
         for dataset in sorted(results_df['dataset'].unique()):
             df_ds = results_df[results_df['dataset'] == dataset]
             if 'pred_age_corrected' in df_ds.columns:
-                mae_ds = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
+                mae_before = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
+                mae_after = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
+                print(f"  {dataset}: MAE = {mae_before:.4f} → {mae_after:.4f} years (n={len(df_ds)})")
             else:
                 mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
-            print(f"  {dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})")
+                print(f"  {dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})")
 
     print("="*60 + "\n")
 

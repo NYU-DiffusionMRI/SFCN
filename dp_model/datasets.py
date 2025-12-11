@@ -15,7 +15,7 @@ _, BIN_CENTERS = dp_utils.num2vect(0.0, BIN_RANGE, BIN_STEP, sigma=0)  # ignore 
 BIN_CENTERS = np.asarray(BIN_CENTERS, dtype=np.float32)  # (40,)
 CROP_SHAPE = (160, 192, 160)
 
-
+# TODO: add age -> soft label conversion in Dataset/DataLoader part (but when evaluating, we don't need to convert the age to soft label(?))
 class T1wDataset(Dataset):
     def __init__(
         self,

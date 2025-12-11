@@ -8,9 +8,18 @@ data:
   unified_csv: "data/unified_data.csv"
 
 model:
-  checkpoint_path: "brain_age/run_20190719_00_epoch_best_mae.p"  # Path to trained model checkpoint
+  checkpoint_path: "brain_age/run_20190719_00_epoch_best_mae.p"
+
+fine_tune:
+  batch_size: 8
+  num_workers: 16
+  lr: 2.5e-3
+  weight_decay: 0.0005
+  max_epochs: 50
+  patience: 10
+  ckpt_dir:   "./checkpoints"
 
 evaluation:
   batch_size: 8
-  num_workers: 4
-  output_dir: "results"  # Directory to save evaluation results
+  num_workers: 16
+  output_dir: "results"
