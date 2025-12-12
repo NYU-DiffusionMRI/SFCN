@@ -52,12 +52,7 @@ def evaluate(model, loader, device):
     mae = np.mean(np.abs(np.array(all_preds) - np.array(all_trues)))
     return avg_loss, mae
 
-def train_single_lr(config, lr, experiment_name, device):
-    """Train with a single learning rate."""
-    print(f"\n{'='*60}")
-    print(f"Training with LR={lr}")
-    print(f"{'='*60}\n")
-
+def train(config, experiment_name, device):
     # Load and filter data (ages 44-80, IXI + OASIS_3 only)
     df = pd.read_csv(config['data']['unified_csv'])
     df = df[(df['age'] >= 44) & (df['age'] <= 80)]
@@ -83,16 +78,29 @@ def train_single_lr(config, lr, experiment_name, device):
     model.load_state_dict(checkpoint)
     model = model.to(device)
 
-    # Freeze all except classifier (last layer/head)
+    # Freeze all feature_extractor except last block (conv_5), unfreeze classifier
     for param in model.module.feature_extractor.parameters():
         param.requires_grad = False
+    for param in model.module.feature_extractor.conv_5.parameters():
+        param.requires_grad = True
     for param in model.module.classifier.parameters():
         param.requires_grad = True
 
     # Training setup
-    optimizer = optim.AdamW([p for p in model.parameters() if p.requires_grad],
-                           lr=lr,
-                           weight_decay=config['fine_tune']['weight_decay'])
+    lr_max = config['fine_tune']['lr_max']
+    optimizer = optim.AdamW(
+        [
+            {'params': model.module.feature_extractor.conv_5.parameters(), 'lr': lr_max * 0.1},
+            {'params': model.module.classifier.parameters(), 'lr': lr_max},
+        ],
+        weight_decay=config['fine_tune']['weight_decay']
+    )
+
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=config['fine_tune']['max_epochs'],
+        eta_min=config['fine_tune']['lr_min']
+    )
 
     # Training loop with early stopping
     best_mae = float('inf')
@@ -138,7 +146,7 @@ def train_single_lr(config, lr, experiment_name, device):
 
             ckpt_dir = Path(config['fine_tune']['ckpt_dir']) / experiment_name
             ckpt_dir.mkdir(parents=True, exist_ok=True)
-            ckpt_path = ckpt_dir / f"lr{lr}_ep{epoch+1}.pth"
+            ckpt_path = ckpt_dir / f"ckpt_ep{epoch+1}.pth"
             torch.save(model.state_dict(), ckpt_path)
 
             print(f' New best model saved to {ckpt_path}')
@@ -150,6 +158,8 @@ def train_single_lr(config, lr, experiment_name, device):
                 print(f'Early stopping at epoch {epoch+1}')
                 break
 
+        scheduler.step()
+
     print(f'Best Val MAE: {best_mae:.2f} at epoch {best_epoch+1}')
     return best_mae
 
@@ -157,28 +167,12 @@ def train_single_lr(config, lr, experiment_name, device):
 def main():
     parser = ArgumentParser()
     parser.add_argument('--experiment-name', type=str, required=True)
-    parser.add_argument('--sweep', action='store_true', help='Run LR sweep')
     args = parser.parse_args()
 
     config = load_config('configs/default.yaml')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # LR sweep
-    if args.sweep:
-        lrs = [3e-5, 5e-5, 1e-4, 3e-4, 5e-4, 1e-3, 2.5e-3, 5e-3, 7.5e-3, 1e-2]
-        results = {}
-        for lr in lrs:
-            mae = train_single_lr(config, lr, args.experiment_name, device)
-            results[lr] = mae
-
-        print(f"\n{'='*60}")
-        print("LR Sweep Results:")
-        print(f"{'='*60}")
-        for lr, mae in results.items():
-            print(f"LR={lr:.0e}: MAE={mae:.2f}")
-    else:
-        lr = config['fine_tune']['lr']
-        train_single_lr(config, lr, args.experiment_name, device)
+    train(config, args.experiment_name, device)
 
 
 if __name__ == '__main__':

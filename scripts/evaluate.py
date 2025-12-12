@@ -232,7 +232,7 @@ def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    checkpoint_path = args.checkpoint if args.checkpoint else config['model']['checkpoint_path']
+    checkpoint_path = args.checkpoint if args.checkpoint else config['evaluation']['ckpt_path']
     unified_csv = config['data']['unified_csv']
 
     # Get root directories for datasets
