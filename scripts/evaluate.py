@@ -20,7 +20,7 @@ import torch
 from pathlib import Path
 
 from dp_model.model_files.sfcn import SFCN
-from dp_model.eval import predict_and_eval, bias_correct
+from dp_model.eval import predict_and_eval, bias_correct, compute_mae, compute_pearson_corr, compute_spearman_corr, compute_r2
 
 
 def load_config(config_path: str = "configs/default.yaml") -> dict:
@@ -153,12 +153,23 @@ def save_results(
 
         # Bias correction results if available
         if bias_correction:
-            f.write(f"MAE (before correction): {bias_correction['mae_before']:.4f} years\n")
-            f.write(f"MAE (after correction):  {bias_correction['mae_after']:.4f} years\n")
+            f.write(f"MAE (before correction):                 {bias_correction['mae_before']:.4f} years\n")
+            f.write(f"MAE (after correction):                  {bias_correction['mae_after']:.4f} years\n")
+            f.write(f"R² (before correction):                  {bias_correction['r2_before']:.4f}\n")
+            f.write(f"R² (after correction):                   {bias_correction['r2_after']:.4f}\n")
+            f.write(f"Pearson r (before correction):           {bias_correction['pearson_before']:.4f}\n")
+            f.write(f"Pearson r (after correction):            {bias_correction['pearson_after']:.4f}\n")
+            f.write(f"Spearman ρ(Δ,age) (before):              {bias_correction['spearman_delta_before']:.4f}\n")
+            f.write(f"Spearman ρ(Δ,age) (after):               {bias_correction['spearman_delta_after']:.4f}\n")
+            f.write(f"Pearson r(Δ,age) (before):               {bias_correction['pearson_delta_before']:.4f}\n")
+            f.write(f"Pearson r(Δ,age) (after):                {bias_correction['pearson_delta_after']:.4f}\n")
+            f.write(f"  [Δ = predicted age - true age; measures age-related bias]\n")
             f.write(f"Bias fit: pred ≈ {bias_correction['a']:.3f} * true + {bias_correction['b']:.3f}\n")
             f.write(f"Calibration samples (MR scans): {bias_correction['n_cal']}\n\n")
         else:
-            f.write(f"Mean Absolute Error (MAE): {mae:.4f} years\n\n")
+            r2_overall = compute_r2(results_df['true_age'].values, results_df['pred_age'].values)
+            f.write(f"Mean Absolute Error (MAE): {mae:.4f} years\n")
+            f.write(f"Coefficient of Determination (R²): {r2_overall:.4f}\n\n")
 
         # Per-dataset statistics if multiple datasets
         if 'dataset' in results_df.columns:
@@ -167,12 +178,42 @@ def save_results(
             for dataset in results_df['dataset'].unique():
                 df_ds = results_df[results_df['dataset'] == dataset]
                 if 'pred_age_corrected' in df_ds.columns:
-                    mae_before = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
-                    mae_after = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
-                    f.write(f"{dataset}: MAE = {mae_before:.4f} → {mae_after:.4f} years (n={len(df_ds)})\n")
+                    mae_before = compute_mae(df_ds['true_age'].values, df_ds['pred_age'].values)
+                    mae_after = compute_mae(df_ds['true_age'].values, df_ds['pred_age_corrected'].values)
+                    r2_before = compute_r2(df_ds['true_age'].values, df_ds['pred_age'].values)
+                    r2_after = compute_r2(df_ds['true_age'].values, df_ds['pred_age_corrected'].values)
+
+                    delta_before = df_ds['pred_age'].values - df_ds['true_age'].values
+                    spearman_delta_before = compute_spearman_corr(df_ds['true_age'].values, delta_before)
+                    pearson_delta_before = compute_pearson_corr(df_ds['true_age'].values, delta_before)
+                    pearson_before = compute_pearson_corr(df_ds['true_age'].values, df_ds['pred_age'].values)
+
+                    delta_after = df_ds['pred_age_corrected'].values - df_ds['true_age'].values
+                    spearman_delta_after = compute_spearman_corr(df_ds['true_age'].values, delta_after)
+                    pearson_delta_after = compute_pearson_corr(df_ds['true_age'].values, delta_after)
+                    pearson_after = compute_pearson_corr(df_ds['true_age'].values, df_ds['pred_age_corrected'].values)
+
+                    f.write(f"{dataset}:\n")
+                    f.write(f"  MAE: {mae_before:.4f} → {mae_after:.4f} years\n")
+                    f.write(f"  R²: {r2_before:.4f} → {r2_after:.4f}\n")
+                    f.write(f"  Pearson r: {pearson_before:.4f} → {pearson_after:.4f}\n")
+                    f.write(f"  Spearman ρ(Δ,age): {spearman_delta_before:.4f} → {spearman_delta_after:.4f}\n")
+                    f.write(f"  Pearson r(Δ,age): {pearson_delta_before:.4f} → {pearson_delta_after:.4f}\n")
+                    f.write(f"  (n={len(df_ds)})\n\n")
                 else:
-                    mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
-                    f.write(f"{dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})\n")
+                    mae_ds = compute_mae(df_ds['true_age'].values, df_ds['pred_age'].values)
+                    r2_ds = compute_r2(df_ds['true_age'].values, df_ds['pred_age'].values)
+                    delta_ds = df_ds['pred_age'].values - df_ds['true_age'].values
+                    spearman_ds = compute_spearman_corr(df_ds['true_age'].values, delta_ds)
+                    pearson_delta_ds = compute_pearson_corr(df_ds['true_age'].values, delta_ds)
+                    pearson_ds = compute_pearson_corr(df_ds['true_age'].values, df_ds['pred_age'].values)
+                    f.write(f"{dataset}:\n")
+                    f.write(f"  MAE: {mae_ds:.4f} years\n")
+                    f.write(f"  R²: {r2_ds:.4f}\n")
+                    f.write(f"  Pearson r: {pearson_ds:.4f}\n")
+                    f.write(f"  Spearman ρ(Δ,age): {spearman_ds:.4f}\n")
+                    f.write(f"  Pearson r(Δ,age): {pearson_delta_ds:.4f}\n")
+                    f.write(f"  (n={len(df_ds)})\n\n")
 
     print(f"Saved summary to: {summary_file}")
 
@@ -320,9 +361,32 @@ def main():
         )
 
         results_df, mae_before, mae_after, (a, b) = bias_correct(cal_df, results_df)
+
+        # Compute correlations before and after bias correction
+        pearson_r = compute_pearson_corr(results_df['true_age'].values, results_df['pred_age'].values)
+        pearson_r_after = compute_pearson_corr(results_df['true_age'].values, results_df['pred_age_corrected'].values)
+        delta_before = results_df['pred_age'].values - results_df['true_age'].values
+        spearman_delta_before = compute_spearman_corr(results_df['true_age'].values, delta_before)
+        pearson_delta_before = compute_pearson_corr(results_df['true_age'].values, delta_before)
+
+        delta_after = results_df['pred_age_corrected'].values - results_df['true_age'].values
+        spearman_delta_after = compute_spearman_corr(results_df['true_age'].values, delta_after)
+        pearson_delta_after = compute_pearson_corr(results_df['true_age'].values, delta_after)
+
+        r2_before = compute_r2(results_df['true_age'].values, results_df['pred_age'].values)
+        r2_after = compute_r2(results_df['true_age'].values, results_df['pred_age_corrected'].values)
+
         bias_correction_results = {
             'mae_before': mae_before,
             'mae_after': mae_after,
+            'r2_before': r2_before,
+            'r2_after': r2_after,
+            'pearson_before': pearson_r,
+            'pearson_after': pearson_r_after,
+            'spearman_delta_before': spearman_delta_before,
+            'spearman_delta_after': spearman_delta_after,
+            'pearson_delta_before': pearson_delta_before,
+            'pearson_delta_after': pearson_delta_after,
             'a': a,
             'b': b,
             'n_cal': len(cal_df)
@@ -338,11 +402,21 @@ def main():
     print("="*60)
 
     if bias_correction_results:
-        print(f"MAE (before correction): {bias_correction_results['mae_before']:.4f} years")
-        print(f"MAE (after correction):  {bias_correction_results['mae_after']:.4f} years")
-        print(f"Improvement: {bias_correction_results['mae_before'] - bias_correction_results['mae_after']:.4f} years")
+        print(f"MAE (before correction):                 {bias_correction_results['mae_before']:.4f} years")
+        print(f"MAE (after correction):                  {bias_correction_results['mae_after']:.4f} years")
+        print(f"R² (before correction):                  {bias_correction_results['r2_before']:.4f}")
+        print(f"R² (after correction):                   {bias_correction_results['r2_after']:.4f}")
+        print(f"Pearson r (before correction):           {bias_correction_results['pearson_before']:.4f}")
+        print(f"Pearson r (after correction):            {bias_correction_results['pearson_after']:.4f}")
+        print(f"Spearman ρ(Δ,true age) (before):         {bias_correction_results['spearman_delta_before']:.4f}")
+        print(f"Spearman ρ(Δ,true age) (after):          {bias_correction_results['spearman_delta_after']:.4f}")
+        print(f"Pearson r(Δ,true age) (before):          {bias_correction_results['pearson_delta_before']:.4f}")
+        print(f"Pearson r(Δ,true age) (after):           {bias_correction_results['pearson_delta_after']:.4f}")
+        print(f"MAE improvement:                         {bias_correction_results['mae_before'] - bias_correction_results['mae_after']:.4f} years")
     else:
+        r2_overall = compute_r2(results_df['true_age'].values, results_df['pred_age'].values)
         print(f"Overall MAE: {mae:.4f} years")
+        print(f"Overall R²: {r2_overall:.4f}")
 
     # Per-dataset results
     if 'dataset' in results_df.columns:
@@ -350,12 +424,43 @@ def main():
         for dataset in sorted(results_df['dataset'].unique()):
             df_ds = results_df[results_df['dataset'] == dataset]
             if 'pred_age_corrected' in df_ds.columns:
-                mae_before = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
-                mae_after = (df_ds['pred_age_corrected'] - df_ds['true_age']).abs().mean()
-                print(f"  {dataset}: MAE = {mae_before:.4f} → {mae_after:.4f} years (n={len(df_ds)})")
+                mae_before = compute_mae(df_ds['true_age'].values, df_ds['pred_age'].values)
+                mae_after = compute_mae(df_ds['true_age'].values, df_ds['pred_age_corrected'].values)
+                r2_before = compute_r2(df_ds['true_age'].values, df_ds['pred_age'].values)
+                r2_after = compute_r2(df_ds['true_age'].values, df_ds['pred_age_corrected'].values)
+
+                delta_before = df_ds['pred_age'].values - df_ds['true_age'].values
+                spearman_delta_before = compute_spearman_corr(df_ds['true_age'].values, delta_before)
+                pearson_delta_before = compute_pearson_corr(df_ds['true_age'].values, delta_before)
+                pearson_before = compute_pearson_corr(df_ds['true_age'].values, df_ds['pred_age'].values)
+
+                delta_after = df_ds['pred_age_corrected'].values - df_ds['true_age'].values
+                spearman_delta_after = compute_spearman_corr(df_ds['true_age'].values, delta_after)
+                pearson_delta_after = compute_pearson_corr(df_ds['true_age'].values, delta_after)
+                pearson_after = compute_pearson_corr(df_ds['true_age'].values, df_ds['pred_age_corrected'].values)
+
+                print(f"  {dataset}:")
+                print(f"    MAE: {mae_before:.4f} → {mae_after:.4f} years")
+                print(f"    R²: {r2_before:.4f} → {r2_after:.4f}")
+                print(f"    Pearson r: {pearson_before:.4f} → {pearson_after:.4f}")
+                print(f"    Spearman ρ(Δ,age): {spearman_delta_before:.4f} → {spearman_delta_after:.4f}")
+                print(f"    Pearson r(Δ,age): {pearson_delta_before:.4f} → {pearson_delta_after:.4f}")
+                print(f"    (n={len(df_ds)})")
             else:
-                mae_ds = (df_ds['pred_age'] - df_ds['true_age']).abs().mean()
-                print(f"  {dataset}: MAE = {mae_ds:.4f} years (n={len(df_ds)})")
+                mae_ds = compute_mae(df_ds['true_age'].values, df_ds['pred_age'].values)
+                r2_ds = compute_r2(df_ds['true_age'].values, df_ds['pred_age'].values)
+                delta_ds = df_ds['pred_age'].values - df_ds['true_age'].values
+                spearman_ds = compute_spearman_corr(df_ds['true_age'].values, delta_ds)
+                pearson_delta_ds = compute_pearson_corr(df_ds['true_age'].values, delta_ds)
+                pearson_ds = compute_pearson_corr(df_ds['true_age'].values, df_ds['pred_age'].values)
+
+                print(f"  {dataset}:")
+                print(f"    MAE: {mae_ds:.4f} years")
+                print(f"    R²: {r2_ds:.4f}")
+                print(f"    Pearson r: {pearson_ds:.4f}")
+                print(f"    Spearman ρ(Δ,age): {spearman_ds:.4f}")
+                print(f"    Pearson r(Δ,age): {pearson_delta_ds:.4f}")
+                print(f"    (n={len(df_ds)})")
 
     print("="*60 + "\n")
 

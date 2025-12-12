@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 from torch.utils.data import DataLoader
+from scipy.stats import pearsonr, spearmanr
 
 
 @torch.no_grad()
@@ -85,3 +86,25 @@ def bias_correct(cal_df: pd.DataFrame, test_df: pd.DataFrame) -> tuple[pd.DataFr
     mae_after = np.abs(test_df['pred_age_corrected'] - test_df['true_age']).mean()
 
     return test_df, mae_before, mae_after, (a, b)
+
+
+def compute_mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute mean absolute error."""
+    return np.mean(np.abs(y_true - y_pred))
+
+
+def compute_pearson_corr(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute Pearson correlation coefficient."""
+    return pearsonr(y_true, y_pred)[0]
+
+
+def compute_spearman_corr(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute Spearman correlation coefficient."""
+    return spearmanr(y_true, y_pred)[0]
+
+
+def compute_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Compute coefficient of determination (R^2)."""
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    return 1 - (ss_res / ss_tot)
